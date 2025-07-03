@@ -5,6 +5,7 @@ import 'package:absenkuy_app/utils/color.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:timelines_plus/timelines_plus.dart';
 import 'package:intl/intl.dart';
 
@@ -44,6 +45,7 @@ class _RiwayatSiswaPageState extends State<RiwayatSiswaPage> {
       final List<dynamic> absensi = data['absensi'];
 
       if (absensi.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           absenList = absensi;
           namaSiswa = nama;
@@ -92,105 +94,108 @@ class _RiwayatSiswaPageState extends State<RiwayatSiswaPage> {
         centerTitle: true,
       ),
       body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
+          SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Kartu info siswa
-                    KelasCard(
-                      title: namaSiswa,
-                      idKelas:
-                          kelasSiswa.isNotEmpty
-                              ? kelasSiswa
-                              : 'Belum ada kelas',
-                      showTrailing: false,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Timeline
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
-                      child:
-                          absenList.isEmpty
-                              ? const Center(
-                                child: Text("Belum ada riwayat absensi."),
-                              )
-                              : FixedTimeline.tileBuilder(
-                                builder: TimelineTileBuilder.connectedFromStyle(
-                                  contentsAlign: ContentsAlign.alternating,
-                                  itemCount: absenList.length,
-
-                                  contentsBuilder: (context, index) {
-                                    final item = absenList[index];
-                                    final status = item['status'];
-                                    final color = getStatusColor(status);
-                                    final kelas = item['kelas']['nama_kelas'];
-                                    final tanggal = item['tanggal'];
-                                    final time = DateFormat.Hm().format(
-                                      DateTime.parse(item['createdAt']),
-                                    );
-
-                                    return Card(
-                                      color: Colors.transparent,
-                                      elevation: 0,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              index % 2 == 0
-                                                  ? CrossAxisAlignment.start
-                                                  : CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              '${status[0].toUpperCase()}${status.substring(1).toLowerCase()}',//artinya index 0 atau huruf pertama besar, selanjutnya akan kecil bwang
-                                              style: TextStyle(
-                                                color: color,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Text(kelas),
-                                            const SizedBox(height: 4),
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.access_time,
-                                                  size: 16,
-                                                  color: Colors.grey,
+                child: Skeletonizer(
+                  enabled: isLoading,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Kartu info siswa
+                      Skeleton.leaf(
+                        child: KelasCard(
+                          title: namaSiswa,
+                          idKelas:
+                              kelasSiswa.isNotEmpty
+                                  ? kelasSiswa
+                                  : 'Belum ada kelas',
+                          showTrailing: false,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                  
+                      // Timeline
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 22),
+                        child:
+                            absenList.isEmpty
+                                ? const Center(
+                                  child: Text("Belum ada riwayat absensi."),
+                                )
+                                : FixedTimeline.tileBuilder(
+                                  builder: TimelineTileBuilder.connectedFromStyle(
+                                    contentsAlign: ContentsAlign.alternating,
+                                    itemCount: absenList.length,
+                      
+                                    contentsBuilder: (context, index) {
+                                      final item = absenList[index];
+                                      final status = item['status'];
+                                      final color = getStatusColor(status);
+                                      final kelas = item['kelas']['nama_kelas'];
+                                      final tanggal = item['tanggal'];
+                                      final time = DateFormat.Hm().format(
+                                        DateTime.parse(item['createdAt']),
+                                      );
+                      
+                                      return Card(
+                                        color: Colors.transparent,
+                                        elevation: 0,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                index % 2 == 0
+                                                    ? CrossAxisAlignment.start
+                                                    : CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                '${status[0].toUpperCase()}${status.substring(1).toLowerCase()}', //artinya index 0 atau huruf pertama besar, selanjutnya akan kecil bwang
+                                                style: TextStyle(
+                                                  color: color,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
-                                                const SizedBox(width: 4),
-                                                Flexible(
-                                                  child: Text(
-                                                    '$time - ${DateFormat('dd MMMM yyyy').format(DateTime.parse(tanggal))}',
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: Colors.grey,
-                                                      fontSize: 12,
+                                              ),
+                                              Text(kelas),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.access_time,
+                                                    size: 16,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Flexible(
+                                                    child: Text(
+                                                      '$time - ${DateFormat('dd MMMM yyyy').format(DateTime.parse(tanggal))}',
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        color: Colors.grey,
+                                                        fontSize: 12,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
+                                                ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-
-                                  connectorStyleBuilder:
-                                      (_, __) => ConnectorStyle.solidLine,
-                                  indicatorStyleBuilder:
-                                      (_, __) => IndicatorStyle.outlined,
+                                      );
+                                    },
+                      
+                                    connectorStyleBuilder:
+                                        (_, __) => ConnectorStyle.solidLine,
+                                    indicatorStyleBuilder:
+                                        (_, __) => IndicatorStyle.outlined,
+                                  ),
                                 ),
-                              ),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
     );

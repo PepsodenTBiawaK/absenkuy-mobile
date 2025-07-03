@@ -9,9 +9,11 @@ import 'package:absenkuy_app/pages/guru/absen_guru_page.dart';
 import 'package:absenkuy_app/pages/logout_page.dart';
 import 'package:absenkuy_app/pages/siswa/info_siswa_page.dart';
 import 'package:absenkuy_app/utils/color.dart';
+import 'package:absenkuy_app/utils/list_gambar.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class HomePageGuru extends StatefulWidget {
   const HomePageGuru({super.key});
@@ -21,16 +23,10 @@ class HomePageGuru extends StatefulWidget {
 }
 
 class _HomePageGuruState extends State<HomePageGuru> {
-  String userName = '';
+  String userName = 'Guru';
   String? token;
-
-  final List<String> listGambar = [
-    'assets/carousel/carousel1.jpg',
-    'assets/carousel/carousel2.jpg',
-    'assets/carousel/carousel3.jpg',
-    'assets/carousel/carousel4.jpg',
-    'assets/carousel/carousel5.jpg',
-  ];
+  List<Map<String, dynamic>> kelasList = [];
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -46,27 +42,41 @@ class _HomePageGuruState extends State<HomePageGuru> {
       userName = name;
       token = savedToken;
     });
+    if (token != null) {
+      fetchKelasGuru();
+    }
   }
 
-  Future<List<Map<String, dynamic>>> fetchKelasGuru(String token) async {
-    final response = await http.get(
-      Uri.parse(Api.kelasGuru),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
+  Future<void> fetchKelasGuru() async {
+    try {
+      final response = await http.get(
+        Uri.parse(Api.kelasGuru),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.cast<Map<String, dynamic>>();
-    } else {
-      throw Exception('Gagal memuat data kelas yang diampu');
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        if (!mounted) return;
+        setState(() {
+          kelasList = data.cast<Map<String, dynamic>>();
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   Future<void> _refreshData() async {
-    setState(() {}); // Memicu build ulang FutureBuilder
+    setState(() {
+      isLoading = true;
+    });
+    await fetchKelasGuru();
   }
 
   @override
@@ -90,7 +100,7 @@ class _HomePageGuruState extends State<HomePageGuru> {
                       ),
                       child: Text(
                         "Selamat Datang 👋",
-                        style: TextStyle(fontSize: 14),
+                        style: const TextStyle(fontSize: 14),
                       ),
                     ),
                     Profil(
@@ -105,67 +115,73 @@ class _HomePageGuruState extends State<HomePageGuru> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                CarouselCard(gambarList: listGambar),
+                CarouselCard(gambarList: listCarousel),
                 const SizedBox(height: 32),
 
                 // Kelas yang Diampu
-                Column(
-                  children: [
-                    Header(title: "Kelas di Ampu"),
-                    const SizedBox(height: 22),
-                    if (token == null)
-                      const CircularProgressIndicator()
-                    else
-                      FutureBuilder<List<Map<String, dynamic>>>(
-                        future: fetchKelasGuru(token!),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const CircularProgressIndicator();
-                          } else if (snapshot.hasError) {
-                            return Text('Terjadi kesalahan: ${snapshot.error}');
-                          } else if (!snapshot.hasData ||
-                              snapshot.data!.isEmpty) {
-                            return const Text('Tidak ada data kelas');
-                          }
-
-                          final kelasList = snapshot.data!;
-                          return Column(
-                            spacing: 12,
-                            children:
-                                kelasList
-                                    .map(
-                                      (kelas) => KelasCard(
-                                        title: kelas['nama_kelas'],
-                                        idKelas: 'ID Kelas: ${kelas['id']}',
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (_) => AbsenPage(
-                                                    showBackButton: true,
-                                                    kelasId: kelas['id'],
-                                                    kelasNama:
-                                                        kelas['nama_kelas'],
-                                                  ),
-                                            ),
-                                          );
-                                        },
+                Skeletonizer(
+                  enabled: isLoading,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton.keep(child: Header(title: "Kelas di Ampu")),
+                      const SizedBox(height: 22),
+                      if (isLoading)
+                        Skeleton.leaf(
+                          child: Column(
+                            children: List.generate(3, (index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Container(
+                                  height: 78,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 22),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        )
+                      else if (kelasList.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 22),
+                          child: Text('Tidak ada data kelas'),
+                        )
+                      else
+                        Column(
+                          children: kelasList.map((kelas) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: KelasCard(
+                                title: kelas['nama_kelas'],
+                                idKelas: 'ID Kelas: ${kelas['id']}',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => AbsenPage(
+                                        showBackButton: true,
+                                        kelasId: kelas['id'],
+                                        kelasNama: kelas['nama_kelas'],
                                       ),
-                                    )
-                                    .toList(),
-                          );
-                        },
-                      ),
-                  ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 32),
                 PengumumanSection(
                   title: "Pengumuman",
-                  gambarList: listGambar,
+                  gambarList: listInfo,
                   onViewAll: () {
-                    print("Lihat Semua Pengumuman");
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -174,6 +190,7 @@ class _HomePageGuruState extends State<HomePageGuru> {
                     );
                   },
                 ),
+                const SizedBox(height: 32),
               ],
             ),
           ),

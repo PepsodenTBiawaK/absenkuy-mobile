@@ -1,5 +1,6 @@
 import 'package:absenkuy_app/component/info_card.dart';
 import 'package:absenkuy_app/utils/color.dart';
+import 'package:absenkuy_app/utils/list_gambar.dart';
 import 'package:flutter/material.dart';
 
 class InfoSiswaPage extends StatefulWidget {
@@ -10,13 +11,7 @@ class InfoSiswaPage extends StatefulWidget {
 }
 
 class _InfoSiswaPage extends State<InfoSiswaPage> {
-  final List<String> gambarList = [
-    'assets/carousel/carousel1.jpg',
-    'assets/carousel/carousel2.jpg',
-    'assets/carousel/carousel3.jpg',
-    'assets/carousel/carousel4.jpg',
-    'assets/carousel/carousel5.jpg',
-  ];
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,7 +26,7 @@ class _InfoSiswaPage extends State<InfoSiswaPage> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(child: InfoCardList(images: gambarList,)),
+      body: SingleChildScrollView(child: InfoCardList(images: listInfo,)),
     );
   }
 }

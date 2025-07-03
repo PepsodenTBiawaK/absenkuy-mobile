@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class AbsenPage extends StatefulWidget {
   final bool showBackButton;
@@ -32,6 +33,7 @@ class _AbsenPageState extends State<AbsenPage> {
   List<Map<String, dynamic>> siswaList = [];
   Map<int, String> statusMap = {};
   bool isLoading = false;
+  bool isKelasLoading = true;
 
   @override
   void initState() {
@@ -58,6 +60,11 @@ class _AbsenPageState extends State<AbsenPage> {
       if (!mounted) return;
       setState(() {
         kelasList = data.cast<Map<String, dynamic>>();
+        isKelasLoading = false;
+      });
+    } else {
+      setState(() {
+        isKelasLoading = false;
       });
     }
   }
@@ -69,6 +76,7 @@ class _AbsenPageState extends State<AbsenPage> {
       selectedKelasNama = kelasNama;
       siswaList = [];
       statusMap = {};
+      isLoading = true;
     });
 
     final prefs = await SharedPreferences.getInstance();
@@ -84,6 +92,11 @@ class _AbsenPageState extends State<AbsenPage> {
       final List data = jsonDecode(response.body);
       setState(() {
         siswaList = data.cast<Map<String, dynamic>>();
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        isLoading = false;
       });
     }
   }
@@ -95,28 +108,19 @@ class _AbsenPageState extends State<AbsenPage> {
 
     final tanggal = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    final absensi =
-        siswaList.map((siswa) {
-          final status = statusMap[siswa['id']];
-          return {
-            'siswa_id': siswa['id'],
-            'status': _convertStatus(status ?? 'A'),
-          };
-        }).toList();
+    final absensi = siswaList.map((siswa) {
+      final status = statusMap[siswa['id']];
+      return {
+        'siswa_id': siswa['id'],
+        'status': _convertStatus(status ?? 'A'),
+      };
+    }).toList();
 
     final body = jsonEncode({
       'kelas_id': selectedKelasId,
       'tanggal': tanggal,
       'absensi': absensi,
     });
-
-    // print(
-    //   jsonEncode({
-    //     'kelas_id': selectedKelasId,
-    //     'tanggal': tanggal,
-    //     'absensi': absensi,
-    //   }),
-    // );
 
     setState(() => isLoading = true);
 
@@ -132,9 +136,8 @@ class _AbsenPageState extends State<AbsenPage> {
     setState(() => isLoading = false);
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Absensi berhasil dikirim')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Absensi berhasil dikirim')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal mengirim absensi: ${response.body}')),
@@ -156,6 +159,14 @@ class _AbsenPageState extends State<AbsenPage> {
     }
   }
 
+  Future<void> _refreshData() async {
+    if (selectedKelasId != null && selectedKelasNama != null) {
+      await fetchSiswaByKelas(selectedKelasId!, selectedKelasNama!);
+    } else {
+      await fetchKelasGuru();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -170,132 +181,150 @@ class _AbsenPageState extends State<AbsenPage> {
         ),
         centerTitle: true,
       ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 22),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 22),
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Warna.primary50,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color.fromARGB(
-                                        32,
-                                        113,
-                                        153,
-                                        210,
-                                      ),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                      spreadRadius: 3,
-                                      blurStyle: BlurStyle.normal,
-                                    ),
-                                  ],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today,
-                                      color: Warna.black600,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      DateFormat(
-                                        'dd MMMM yyyy',
-                                      ).format(DateTime.now()),
-                                      style: const TextStyle(
-                                        color: Warna.black600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
+      body: Skeletonizer(
+        enabled: isLoading || isKelasLoading,
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Warna.primary50,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color.fromARGB(32, 113, 153, 210),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                              spreadRadius: 3,
+                            ),
+                          ],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Skeleton.keep(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.calendar_today, color: Warna.black600, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                DateFormat('dd MMMM yyyy').format(DateTime.now()),
+                                style: const TextStyle(
+                                  color: Warna.black600,
+                                  fontSize: 14,
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      KelasCard(
-                        title: selectedKelasNama ?? 'Pilih Kelas',
-                        idKelas:
-                            selectedKelasId != null
-                                ? 'ID Kelas: $selectedKelasId'
-                                : '',
-                        mode: KelasCardMode.showDropdown,
-                        dropdownItems:
-                            kelasList.map((kelas) {
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Skeleton.leaf(
+                    child: KelasCard(
+                      title: selectedKelasNama ?? 'Pilih Kelas',
+                      idKelas: selectedKelasId != null
+                          ? 'ID Kelas: $selectedKelasId'
+                          : '',
+                      mode: KelasCardMode.showDropdown,
+                      dropdownItems: isKelasLoading
+                          ? []
+                          : kelasList.map((kelas) {
                               return {
                                 'title': kelas['nama_kelas'],
                                 'subtitle': 'ID: ${kelas['id']}',
-                                'onTap':
-                                    () => fetchSiswaByKelas(
+                                'onTap': () => fetchSiswaByKelas(
                                       kelas['id'],
                                       kelas['nama_kelas'],
                                     ),
                               };
                             }).toList(),
-                      ),
-                      const SizedBox(height: 32),
-                      Header(title: "Nama Siswa"),
-                      const SizedBox(height: 22),
-                      ...siswaList.map(
-                        (siswa) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: SiswaCard(
-                            name: siswa['nama_siswa'],
-                            selectedValue: statusMap[siswa['id']] ?? 'A',
-                            onChanged: (status) {
-                              setState(() {
-                                statusMap[siswa['id']] = status;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-
-                      if (selectedKelasId != null && siswaList.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 22),
-                          child: ElevatedButton(
-                            onPressed: submitAbsensi,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Warna.primary600,
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              shape: RoundedRectangleBorder(
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Skeleton.keep(child: Header(title: "Nama Siswa")),
+                  const SizedBox(height: 22),
+                  if (isLoading)
+                    Skeleton.leaf(
+                      child: Column(
+                        children: List.generate(5, (index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Container(
+                              height: 78,
+                              margin: const EdgeInsets.symmetric(horizontal: 22),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text(
-                              'Submit',
-                              style: TextStyle(color: Warna.black100),
-                            ),
+                          );
+                        }),
+                      ),
+                    )
+                  else if (siswaList.isEmpty)
+                    Skeleton.keep(
+                      child: const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Center(
+                          child: Text(
+                            'Belum ada data nama siswa',
+                            style: TextStyle(color: Colors.black54),
                           ),
                         ),
-                    ],
+                      ),
+                    )
+                  else ...siswaList.map(
+                    (siswa) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SiswaCard(
+                        name: siswa['nama_siswa'],
+                        selectedValue: statusMap[siswa['id']] ?? 'A',
+                        onChanged: (status) {
+                          setState(() {
+                            statusMap[siswa['id']] = status;
+                          });
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                  if (selectedKelasId != null && siswaList.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                      child: ElevatedButton(
+                        onPressed: submitAbsensi,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Warna.primary600,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Submit',
+                          style: TextStyle(color: Warna.black100),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
